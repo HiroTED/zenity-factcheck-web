@@ -1,12 +1,18 @@
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-bedrock-agent-runtime";
 import { NextRequest, NextResponse } from "next/server";
 
+const credentials =
+  process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+    ? {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        ...(process.env.AWS_SESSION_TOKEN && { sessionToken: process.env.AWS_SESSION_TOKEN }),
+      }
+    : undefined; // fall back to SDK default credential chain (instance profile, env, etc.)
+
 const client = new BedrockAgentRuntimeClient({
   region: process.env.AWS_REGION ?? "us-east-1",
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
+  ...(credentials && { credentials }),
 });
 
 export async function POST(req: NextRequest) {
@@ -39,7 +45,20 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ result });
   } catch (error) {
-    console.error("Bedrock Agent Error:", JSON.stringify(error, null, 2));
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    const err = error as Record<string, unknown>;
+    console.error("Bedrock Agent Error:", {
+      name: err?.name,
+      message: err?.message,
+      code: err?.Code ?? err?.code,
+      statusCode: err?.$metadata ? (err.$metadata as Record<string, unknown>)?.httpStatusCode : undefined,
+      region: process.env.AWS_REGION ?? "us-east-1",
+      agentId: process.env.BEDROCK_AGENT_ID ? "set" : "MISSING",
+      agentAliasId: process.env.BEDROCK_AGENT_ALIAS_ID ? "set" : "MISSING",
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID ? "set" : "MISSING",
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ? "set" : "MISSING",
+      sessionToken: process.env.AWS_SESSION_TOKEN ? "set" : "not set",
+    });
+    const message = err?.message ? String(err.message) : String(error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
