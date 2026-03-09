@@ -25,11 +25,36 @@ export async function POST(req: NextRequest) {
 
     const sessionId = Math.random().toString(36).substring(2, 18);
 
+    const prompt = `
+You are a fact-checking agent. Analyze the following article and return ONLY a JSON object with no other text.
+
+Article:
+${article}
+
+Return this exact JSON format:
+{
+  "segments": [
+    {"text": "exact text from article", "status": "accurate|incorrect|unverified", "correction": "correction if incorrect, otherwise omit this field"}
+  ],
+  "improvements": [
+    "improvement suggestion 1",
+    "improvement suggestion 2"
+  ]
+}
+
+Rules:
+- segments must cover the ENTIRE article text with no gaps
+- status: "accurate" = verified correct, "incorrect" = wrong, "unverified" = could not verify
+- corrections must be in Japanese
+- improvements must be in Japanese
+- Return ONLY the JSON, no other text
+`;
+
     const command = new InvokeAgentCommand({
       agentId: process.env.BEDROCK_AGENT_ID!,
       agentAliasId: process.env.BEDROCK_AGENT_ALIAS_ID!,
       sessionId,
-      inputText: article,
+      inputText: prompt,
     });
 
     const response = await client.send(command);
