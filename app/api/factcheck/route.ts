@@ -1,13 +1,29 @@
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-bedrock-agent-runtime";
 import { NextRequest, NextResponse } from "next/server";
 
+// ARN (arn:aws:bedrock:...:agent/ID) またはIDのみ両方に対応
+function extractId(arnOrId: string): string {
+  if (arnOrId.startsWith("arn:")) {
+    const parts = arnOrId.split("/");
+    return parts[parts.length - 1];
+  }
+  return arnOrId;
+}
+
+const rawAgentId = process.env.BEDROCK_AGENT_ID ?? "";
+const rawAliasId = process.env.BEDROCK_AGENT_ALIAS_ID ?? "";
+const agentId = extractId(rawAgentId);
+const agentAliasId = extractId(rawAliasId);
+
 console.log("ENV CHECK:", {
   region: process.env.AWS_REGION,
-  agentId: process.env.BEDROCK_AGENT_ID,
-  aliasId: process.env.BEDROCK_AGENT_ALIAS_ID,
+  agentId,
+  agentAliasId,
   accessKey: process.env.AWS_ACCESS_KEY_ID?.substring(0, 8),
   hasSecret: !!process.env.AWS_SECRET_ACCESS_KEY,
-});const client = new BedrockAgentRuntimeClient({
+});
+
+const client = new BedrockAgentRuntimeClient({
   region: process.env.AWS_REGION ?? "us-east-1",
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
@@ -51,8 +67,8 @@ Rules:
 `;
 
     const command = new InvokeAgentCommand({
-      agentId: process.env.BEDROCK_AGENT_ID!,
-      agentAliasId: process.env.BEDROCK_AGENT_ALIAS_ID!,
+      agentId,
+      agentAliasId,
       sessionId,
       inputText: prompt,
     });
